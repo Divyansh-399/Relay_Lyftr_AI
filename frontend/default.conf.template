@@ -1,0 +1,15 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' ${API_BASE_URL}; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'" always;
+    location = /config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        return 200 'window.RELAY_CONFIG = {"api":"${API_BASE_URL}"};';
+    }
+    location / { try_files $uri $uri/ /index.html; }
+}

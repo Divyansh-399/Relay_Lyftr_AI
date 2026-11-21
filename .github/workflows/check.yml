@@ -1,0 +1,52 @@
+name: Project checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements-dev.txt
+      - run: python -c "import litellm"
+      - run: python -m pytest -q
+        working-directory: backend
+        env:
+          LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install && npm run build
+        working-directory: frontend
+      - run: npm audit --audit-level=high
+        working-directory: frontend
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      LLM_API_KEYS: ci-only-first,ci-only-second
+    steps:
+      - uses: actions/checkout@v4
+      - run: make up
+      - run: |
+          curl -fsS --retry 45 --retry-all-errors --retry-delay 2 http://localhost:8000/health | jq -e '.status == "ok" and .keys_configured == 2'
+          curl -fsS http://localhost:3000/config.js | grep -F 'http://localhost:8000'
+          curl -fsS http://localhost:3000 | grep -F 'id="root"'
+          status=$(curl -sS -o /tmp/chat-result -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Simulate-Failure: *=429' -d '{"session_id":"ci","message":"hello"}' http://localhost:8000/chat)
+          test "$status" = 503
+          jq -e '.detail == "all providers unavailable"' /tmp/chat-result
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: python scripts/check_browser.py
+      - run: make down
+        if: always()
+

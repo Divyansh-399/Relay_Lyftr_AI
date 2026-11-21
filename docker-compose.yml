@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      LLM_API_KEYS: ${LLM_API_KEYS:?Set two distinct keys in .env}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-4o-mini}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}
+      ENABLE_FAILURE_SIMULATION: ${ENABLE_FAILURE_SIMULATION:-true}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      CHAT_REQUESTS_PER_MINUTE: ${CHAT_REQUESTS_PER_MINUTE:-60}
+      CHAT_MAX_CONCURRENT: ${CHAT_MAX_CONCURRENT:-8}
+    ports: ["8000:8000"]
+    volumes: ["history:/data"]
+    restart: unless-stopped
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    ports: ["3000:3000"]
+    depends_on: [backend]
+volumes:
+  history: {}
